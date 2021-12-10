@@ -1,13 +1,5 @@
 # Unity Runtime Preview Generator
 
-**Available on Asset Store:** https://assetstore.unity.com/packages/tools/camera/runtime-preview-generator-112860
-
-**Forum Thread:** https://forum.unity.com/threads/runtime-preview-thumbnail-generator-open-source.500194/
-
-**Discord:** https://discord.gg/UJJt549AaV
-
-**[Support the Developer ☕](https://yasirkula.itch.io/unity3d)**
-
 This plugin helps you generate preview textures (thumbnails) for your **GameObjects** or **materials** in **Texture2D** format on the fly.
 
 ## FEATURES
@@ -15,18 +7,6 @@ This plugin helps you generate preview textures (thumbnails) for your **GameObje
 - Supports perspective and orthographic projections
 - Supports transparent background
 - Customizable preview direction and background color
-
-## INSTALLATION
-
-There are 5 ways to install this plugin:
-
-- import [RuntimePreviewGenerator.unitypackage](https://github.com/yasirkula/UnityRuntimePreviewGenerator/releases) via *Assets-Import Package*
-- clone/[download](https://github.com/yasirkula/UnityRuntimePreviewGenerator/archive/master.zip) this repository and move the *Plugins* folder to your Unity project's *Assets* folder
-- import it from [Asset Store](https://assetstore.unity.com/packages/tools/camera/runtime-preview-generator-112860)
-- *(via Package Manager)* add the following line to *Packages/manifest.json*:
-  - `"com.yasirkula.runtimepreviewgenerator": "https://github.com/yasirkula/UnityRuntimePreviewGenerator.git",`
-- *(via [OpenUPM](https://openupm.com))* after installing [openupm-cli](https://github.com/openupm/openupm-cli), run the following command:
-  - `openupm add com.yasirkula.runtimepreviewgenerator`
 
 ## HOW TO
 
