@@ -116,6 +116,20 @@ public static class RuntimePreviewGenerator
 		set { m_previewDirection = value.normalized; }
 	}
 
+	private static Vector3 m_previewAngle = new Vector3(90, 0, 0);
+	public static Vector3 PreviewAngle
+    {
+		get { return m_previewAngle; }
+		set { m_previewAngle = value; }
+    }
+
+	private static bool m_previewAngleMode = false;
+	public static bool PreviewAngleMode
+    {
+        get { return m_previewAngleMode; }
+		set { m_previewAngleMode = value; }
+    }
+
 	private static float m_padding;
 	public static float Padding
 	{
@@ -136,6 +150,13 @@ public static class RuntimePreviewGenerator
 		get { return m_orthographicMode; }
 		set { m_orthographicMode = value; }
 	}
+
+	private static float m_orthographicSize = 10f;
+	public static float OrthographicSize
+    {
+		get { return m_orthographicSize; }
+		set { m_orthographicSize = value; }
+    }
 
 	private static bool m_markTextureNonReadable = true;
 	public static bool MarkTextureNonReadable
@@ -171,12 +192,12 @@ public static class RuntimePreviewGenerator
 		return null;
 	}
 
-	public static Texture2D GenerateModelPreview( Transform model, int width = 64, int height = 64, bool shouldCloneModel = false )
+	public static Texture2D GenerateModelPreview( Transform model, int width = 64, int height = 64, bool shouldCloneModel = false, int layer_mask = 0 )
 	{
-		return GenerateModelPreviewWithShader( model, null, null, width, height, shouldCloneModel );
+		return GenerateModelPreviewWithShader( model, null, null, width, height, shouldCloneModel, layer_mask );
 	}
 
-	public static Texture2D GenerateModelPreviewWithShader( Transform model, Shader shader, string replacementTag, int width = 64, int height = 64, bool shouldCloneModel = false )
+	public static Texture2D GenerateModelPreviewWithShader( Transform model, Shader shader, string replacementTag, int width = 64, int height = 64, bool shouldCloneModel = false, int layer_mask = 0 )
 	{
 		if( !model )
 			return null;
@@ -212,9 +233,16 @@ public static class RuntimePreviewGenerator
 		try
 		{
 			SetupCamera();
-			SetLayerRecursively( previewObject );
+			if (layer_mask != 0)
+            {
+				SetLayerRecursively(previewObject, layer_mask);
+			}
+			else
+            {
+				SetLayerRecursively(previewObject);
+			}
 
-			if( !isStatic )
+			if ( !isStatic )
 			{
 				previewObject.position = PREVIEW_POSITION;
 				previewObject.rotation = Quaternion.identity;
@@ -224,8 +252,16 @@ public static class RuntimePreviewGenerator
 				previewObject.gameObject.SetActive( true );
 
 			Bounds previewBounds = new Bounds();
-			if( !CalculateBounds( previewObject, out previewBounds ) )
-				return null;
+			if (layer_mask != 0)
+            {
+				if (!CalculateBounds(previewObject, out previewBounds, layer_mask))
+					return null;
+			}
+			else
+            {
+				if (!CalculateBounds(previewObject, out previewBounds))
+					return null;
+			}
 
 #if DEBUG_BOUNDS
 			if( !boundsDebugMaterial )
@@ -247,7 +283,14 @@ public static class RuntimePreviewGenerator
 #endif
 
 			renderCamera.aspect = (float) width / height;
-			renderCamera.transform.rotation = Quaternion.LookRotation( previewObject.rotation * m_previewDirection, previewObject.up );
+			if (m_previewAngleMode)
+            {
+				renderCamera.transform.eulerAngles = m_previewAngle;
+            }
+			else
+            {
+				renderCamera.transform.rotation = Quaternion.LookRotation(previewObject.rotation * m_previewDirection, previewObject.up);
+			}
 
 			CalculateCameraPosition( renderCamera, previewBounds, m_padding );
 
@@ -274,6 +317,7 @@ public static class RuntimePreviewGenerator
 				result = new Texture2D( width, height, m_backgroundColor.a < 1f ? TextureFormat.RGBA32 : TextureFormat.RGB24, false );
 				result.ReadPixels( new Rect( 0f, 0f, width, height ), 0, 0, false );
 				result.Apply( false, m_markTextureNonReadable );
+				result.name = string.Format("PreviewTexture_{0}", model.name);
 			}
 			finally
 			{
@@ -318,6 +362,22 @@ public static class RuntimePreviewGenerator
 		return result;
 	}
 
+	public static void GetRendererInChildren(Transform trans, List<Renderer> list, int layer_mask)
+    {
+		if (((1 << trans.gameObject.layer) & layer_mask) == 0)
+        {
+			Renderer renderer = trans.gameObject.GetComponent<Renderer>();
+			if (renderer != null)
+            {
+				list.Add(renderer);
+            }
+        }
+		foreach (Transform child in trans)
+        {
+			GetRendererInChildren(child, list, layer_mask);
+        }
+    }
+
 	// Calculates AABB bounds of the target object (AABB will include its child objects)
 	public static bool CalculateBounds( Transform target, out Bounds bounds )
 	{
@@ -341,6 +401,34 @@ public static class RuntimePreviewGenerator
 		}
 
 		return hasBounds;
+	}
+
+	//
+	// Calculates AABB bounds of the target object (AABB will include its child objects)
+	//
+	public static bool CalculateBounds(Transform target, out Bounds bounds, int layer_mask)
+    {
+		renderersList.Clear();
+		GetRendererInChildren(target, renderersList, layer_mask);
+
+		bounds = new Bounds();
+		bool hasBounds = false;
+		for (int i = 0; i < renderersList.Count; i++)
+		{
+			if (!renderersList[i].enabled)
+				continue;
+
+			if (!hasBounds)
+			{
+				bounds = renderersList[i].bounds;
+				hasBounds = true;
+			}
+			else
+				bounds.Encapsulate(renderersList[i].bounds);
+		}
+
+		return hasBounds;
+
 	}
 
 	// Moves camera in a way such that it will encapsulate bounds perfectly
@@ -526,6 +614,16 @@ public static class RuntimePreviewGenerator
 		obj.gameObject.layer = PREVIEW_LAYER;
 		for( int i = 0; i < obj.childCount; i++ )
 			SetLayerRecursively( obj.GetChild( i ) );
+	}
+
+	private static void SetLayerRecursively(Transform obj, int layer_mask)
+	{
+		if (((1 << obj.gameObject.layer) & layer_mask) == 0)
+        {
+			obj.gameObject.layer = PREVIEW_LAYER;
+		}
+		for (int i = 0; i < obj.childCount; i++)
+			SetLayerRecursively(obj.GetChild(i), layer_mask);
 	}
 
 	private static void GetLayerRecursively( Transform obj )
